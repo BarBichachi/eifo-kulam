@@ -1,0 +1,21 @@
+node_modules/
+dist/
+build/
+coverage/
+*.log
+
+# Personal data: never committed (names and phones live only in the Google Sheet)
+*.xlsx
+*.xls
+*.csv
+roster*.json
+*.local.*
+
+# Secrets and per-machine Apps Script binding
+.env*
+!.env.example
+.clasp.json
+.clasprc.json
+
+# Local verification artifacts
+screenshots/

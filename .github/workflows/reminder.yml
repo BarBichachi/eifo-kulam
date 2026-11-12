@@ -1,0 +1,53 @@
+name: Weekly reminder
+
+# Wednesday 07:30 Israel time. Two crons cover both UTC offsets (UTC+2 winter, UTC+3 summer);
+# scripts/reminder.ts skips the wrong one, waits until 07:30, and a claim in the Sheet makes it exactly-once.
+on:
+  schedule:
+    - cron: '5 4 * * 3'
+    - cron: '5 5 * * 3'
+  workflow_dispatch:
+    inputs:
+      memberId:
+        description: 'Test push to one member id (empty = weekly reminder)'
+        required: false
+        default: ''
+      force:
+        description: 'Send the weekly reminder now (ignores the time window)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: reminder-${{ inputs.memberId || 'weekly' }}
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node scripts/reminder.ts
+        env:
+          API_URL: ${{ vars.API_URL }}
+          APP_URL: ${{ vars.APP_URL }}
+          SERVICE_TOKEN: ${{ secrets.SERVICE_TOKEN }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          MEMBER_ID: ${{ inputs.memberId }}
+          FORCE: ${{ inputs.force && 'true' || 'false' }}
+      # GitHub disables scheduled workflows after 60 days without repo activity; re-enabling resets that clock
+      - name: Keep the schedule alive
+        if: always() && github.event_name == 'schedule'
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/reminder.yml/enable"
+        env:
+          GH_TOKEN: ${{ github.token }}
