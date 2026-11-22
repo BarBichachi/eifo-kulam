@@ -89,3 +89,81 @@ describe('Store', () => {
     expect(store.state.weeks).toEqual({});
   });
 });
+
+describe('Store: loading and freshness', () => {
+  const BOOT = { me: ME, members: [ME], statuses: [], vapidPublicKey: '', pushTestEnabled: false };
+  // Resolves when the test calls the returned function: lets a test interleave a read with an edit
+  const deferred = <T,>() => {
+    let resolve!: (v: T) => void;
+    const promise = new Promise<T>((r) => (resolve = r));
+    return { promise, resolve };
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-17T08:00:00Z'));
+    localStorage.clear();
+    apiMock.mockReset();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('loads roster and last/this/next week in one request; screens share it', async () => {
+    const store = loggedInStore();
+    store.state.weeks = {};
+    apiMock.mockResolvedValue({ ...BOOT, range: { entries: [entry('2026-11-10', 'sick'), entry('2026-11-24', 'home')], holidays: [] } });
+    const boot = store.loadBoot();
+    const screen = store.loadWeek('2026-11-22');
+    await Promise.all([boot, screen]);
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(apiMock.mock.calls[0]![1]).toEqual({ from: '2026-11-08', to: '2026-11-28' });
+    expect(Object.keys(store.state.weeks).sort()).toEqual(['2026-11-08', '2026-11-15', '2026-11-22']);
+    expect(store.state.weeks['2026-11-22']!.entries.map((e) => e.statusId)).toEqual(['home']);
+  });
+
+  it('login returns everything needed to render in a single round trip', async () => {
+    const store = new Store();
+    apiMock.mockResolvedValue({ token: 't'.repeat(64), me: ME, boot: BOOT, range: { entries: [entry('2026-11-16', 'vacation')], holidays: [] } });
+    await store.login('0541112233');
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(store.state.boot).toEqual(BOOT);
+    expect(store.state.weeks[WS]!.entries.map((e) => e.statusId)).toEqual(['vacation']);
+  });
+
+  it('a read that started before my edit does not overwrite it', async () => {
+    const store = loggedInStore();
+    const read = deferred<unknown>();
+    apiMock.mockImplementation((action: string) => (action === 'getRange' ? read.promise : Promise.resolve({ entries: [entry('2026-11-16', 'sick')] })));
+    const loading = store.loadWeek(WS, true);
+    store.queueDays('m1', [{ date: '2026-11-16', statusId: 'sick', note: '' }]);
+    await vi.advanceTimersByTimeAsync(800);
+    read.resolve({ entries: [entry('2026-11-15', 'home')], holidays: [] });
+    await loading;
+    expect(store.state.weeks[WS]!.entries.find((e) => e.date === '2026-11-16')?.statusId).toBe('sick');
+    expect(store.state.weeks[WS]!.fetchedAt).toBe(0);
+  });
+
+  it('polling re-fetches the weeks on screen so other people\'s changes appear', async () => {
+    const store = loggedInStore();
+    const unwatch = store.watch(WS);
+    apiMock.mockResolvedValue({ entries: [entry('2026-11-15', 'home'), { ...entry('2026-11-16', 'reserve'), memberId: 'm2' }], holidays: [] });
+    await store.poll();
+    expect(apiMock).toHaveBeenCalledWith('getRange', { from: WS, to: '2026-11-21' }, 't'.repeat(64));
+    expect(store.state.weeks[WS]!.entries.some((e) => e.memberId === 'm2')).toBe(true);
+    unwatch();
+    apiMock.mockClear();
+    await store.poll();
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it('a failed background refresh keeps the data and flags it as not updated', async () => {
+    const store = loggedInStore();
+    store.watch(WS);
+    apiMock.mockRejectedValue(new ApiError('NETWORK', 'אין חיבור לשרת'));
+    await store.refreshVisible();
+    expect(store.state.weeks[WS]!.entries.map((e) => e.statusId)).toEqual(['home']);
+    expect(store.state.staleError).toBe('אין חיבור לשרת');
+    apiMock.mockResolvedValue({ entries: [], holidays: [] });
+    await store.refreshVisible();
+    expect(store.state.staleError).toBeNull();
+  });
+});

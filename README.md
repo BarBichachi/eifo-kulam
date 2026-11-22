@@ -21,6 +21,12 @@ everyone else read-only. A push notification every Wednesday at 07:30 reminds th
 On every launch of the phone app, if notifications are off for that device, a sheet asks to turn them on (iPhone
 in a browser tab gets the home-screen install steps instead). If they are on, the device is silently re-registered.
 
+Loading and freshness: login and app start fetch the roster plus last/this/next week in one request (each Apps
+Script call costs about 2s of fixed overhead, so round trips are what matter). Cached data shows immediately on
+reopen. Weeks on screen re-fetch every 60s while the app is visible, on resume and when the network returns, so
+other people's changes appear without reopening. A refresh never overwrites the user's own newer edits. The top
+bar shows a spinner while syncing, a refresh button, or "לא מעודכן · נסו שוב" when shown data could not be updated.
+
 Day model: an optional **status** plus an optional **note**. A note without a status is saved as **אחר**, which
 requires a note. Untouched days show the member type default, faded: regular = **במשרד**, student = **לא מגיע**.
 Day-off holidays (from Hebcal, Israel schedule) show **חג** unless the person filled something. Retired statuses
@@ -60,7 +66,7 @@ only one that can install to the home screen and receive push notifications.
 | `entries` | date, memberId, statusId, note, updatedAt, updatedBy (empty statusId = reset to default) |
 | `sessions` | tokenHash, memberId, createdAt, lastSeenAt |
 | `push` | memberId, endpoint, p256dh, auth, createdAt, lastResult, lastResultAt |
-| `holidays` | date, name, isDayOff, source (imported lazily per year from Hebcal; edit `isDayOff` freely) |
+| `holidays` | date, name, isDayOff, source (imported lazily per year from Hebcal, only within 2 years of today; edit `isDayOff` freely) |
 | `log` | timestamp, actorId, memberId, date, before, after (every change) |
 | `settings` | key, value (holiday years loaded, last reminder week) |
 

@@ -22,14 +22,16 @@ export function useStore<T>(select: (s: State) => T): T {
   return value;
 }
 
-/** Loads (and refreshes) one week and returns its indexes. */
-export function useWeek(ws: string) {
-  const week = useStore((s) => s.weeks[ws]);
-  const error = useStore((s) => s.weekErrors[ws]);
-  const tick = useStore((s) => s.resumeTick);
+/** Loads one week (none for null), keeps it refreshed while on screen, and returns its indexes. */
+export function useWeek(ws: string | null) {
+  const week = useStore((s) => (ws ? s.weeks[ws] : undefined));
+  const error = useStore((s) => (ws ? s.weekErrors[ws] : undefined));
   useEffect(() => {
+    if (!ws) return;
+    const unwatch = store.watch(ws);
     void store.loadWeek(ws);
-  }, [ws, tick]);
+    return unwatch;
+  }, [ws]);
   const entries = useMemo(() => indexEntries(week?.entries ?? []), [week]);
   const holidays = useMemo(() => indexHolidays(week?.holidays ?? []), [week]);
   return { loaded: !!week, error, entries, holidays };

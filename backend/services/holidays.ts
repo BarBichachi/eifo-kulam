@@ -8,13 +8,20 @@ function loadedYears(ctx: Ctx): Set<number> {
   return new Set((ctx.repo.setting(YEARS_KEY) ?? '').split(',').filter(Boolean).map(Number));
 }
 
+/** Holidays are imported only near the present; browsing far away just shows no holidays. */
+const YEARS_BACK = 2;
+const YEARS_AHEAD = 2;
+
 /**
  * Lazily imports Hebcal holidays for each year in the range. Existing rows (including manual edits
  * to isDayOff) are never overwritten. A Hebcal outage is logged and retried on the next request.
  */
 export function ensureHolidayYears(ctx: Ctx, from: string, to: string): void {
+  const thisYear = Number(ctx.p.now().toISOString().slice(0, 4));
+  const first = Math.max(Number(from.slice(0, 4)), thisYear - YEARS_BACK);
+  const last = Math.min(Number(to.slice(0, 4)), thisYear + YEARS_AHEAD);
   const wanted: number[] = [];
-  for (let y = Number(from.slice(0, 4)); y <= Number(to.slice(0, 4)); y++) wanted.push(y);
+  for (let y = first; y <= last; y++) wanted.push(y);
   const missing = wanted.filter((y) => !loadedYears(ctx).has(y));
   for (const year of missing) {
     try {

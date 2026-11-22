@@ -60,13 +60,24 @@ export interface ServiceConfig {
   githubDispatchToken?: string;
 }
 
+/** Optional date window a call can ask for, so the first screens need no extra round trip. */
+export interface RangeReq {
+  from?: string;
+  to?: string;
+}
+
+export interface RangeData {
+  entries: Entry[];
+  holidays: Holiday[];
+}
+
 /** Every API action: request payload and response data. Requests also carry a session or service token. */
 export interface ApiMap {
   health: { req: NoParams; res: { name: string; version: string; time: string } };
-  login: { req: { phone: string }; res: { token: string; me: Member } };
+  login: { req: { phone: string } & RangeReq; res: { token: string; me: Member; boot?: Bootstrap; range?: RangeData } };
   logout: { req: NoParams; res: { ok: true } };
-  bootstrap: { req: NoParams; res: Bootstrap };
-  getRange: { req: { from: string; to: string }; res: { entries: Entry[]; holidays: Holiday[] } };
+  bootstrap: { req: RangeReq; res: Bootstrap & { range?: RangeData } };
+  getRange: { req: { from: string; to: string }; res: RangeData };
   setDays: { req: { memberId: string; days: DayInput[] }; res: { entries: Entry[] } };
 
   adminMembers: { req: NoParams; res: { members: Member[] } };

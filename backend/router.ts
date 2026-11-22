@@ -5,7 +5,7 @@ import type { Ctx } from './context.ts';
 import { adminMembers, importMembers, reorder, saveMember, saveStatus } from './handlers/admin.ts';
 import { pushCoverage, pushSubscribe, pushTest, pushUnsubscribe, svcPushList, svcPushReport, svcReminderClaim } from './handlers/push.ts';
 import { svcConfigure } from './handlers/service.ts';
-import { bootstrap, getRange, setDays } from './handlers/user.ts';
+import { bootstrap, getRange, rangeIfAsked, setDays, withBoot } from './handlers/user.ts';
 import { authenticate, login, logout, requireService, revokeMemberSessions } from './services/auth.ts';
 
 export const APP_VERSION = '1.0.0';
@@ -20,9 +20,9 @@ type Route =
 /** Every action, its access level and handler. */
 const ROUTES: Record<Action, Route> = {
   health: { auth: 'none', run: (ctx) => ({ name: 'eifo-kulam', version: APP_VERSION, time: ctx.p.now().toISOString() }) },
-  login: { auth: 'none', run: (ctx, req) => login(ctx, req.phone) },
+  login: { auth: 'none', run: (ctx, req) => withBoot(ctx, login(ctx, req.phone), req) },
   logout: { auth: 'none', run: (ctx, req) => (logout(ctx, req.token), { ok: true }) },
-  bootstrap: { auth: 'user', run: (ctx, _req, me) => bootstrap(ctx, me) },
+  bootstrap: { auth: 'user', run: (ctx, req, me) => ({ ...bootstrap(ctx, me), ...rangeIfAsked(ctx, req) }) },
   getRange: { auth: 'user', run: (ctx, req) => getRange(ctx, req) },
   setDays: { auth: 'user', run: (ctx, req, me) => setDays(ctx, me, req) },
 

@@ -38,3 +38,7 @@ export const IconClose = (p: IconProps) => <Svg {...p}><path d="M6 6l12 12M18 6L
 export const IconShare = (p: IconProps) => (
   <Svg {...p}><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4" /></Svg>
 );
+
+export const IconRefresh = (p: IconProps) => (
+  <Svg {...p}><path d="M20 11a8 8 0 1 0-2.3 5.7" /><path d="M20 4v7h-7" /></Svg>
+);

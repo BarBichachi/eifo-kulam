@@ -1,4 +1,32 @@
 import { useStore } from '../data/hooks.ts';
+import { store } from '../data/store.ts';
+import { IconRefresh } from './Icons.tsx';
+
+/** Refresh control in the top bar: spinner while syncing, a warning when shown data could not be updated. */
+export function SyncStatus() {
+  const refreshing = useStore((s) => s.refreshing);
+  const staleError = useStore((s) => s.staleError);
+  const refresh = () => void store.refreshNow();
+  if (refreshing) {
+    return (
+      <span class="sync is-busy" role="status" aria-label="מתעדכן">
+        <span class="spinner is-small" aria-hidden="true" />
+      </span>
+    );
+  }
+  if (staleError) {
+    return (
+      <button type="button" class="sync is-stale" onClick={refresh} title={staleError}>
+        ⚠ לא מעודכן · נסו שוב
+      </button>
+    );
+  }
+  return (
+    <button type="button" class="sync icon-btn" onClick={refresh} aria-label="רענון">
+      <IconRefresh />
+    </button>
+  );
+}
 
 /** Global toast + autosave status, announced to screen readers. */
 export function Toasts() {

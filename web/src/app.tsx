@@ -1,5 +1,4 @@
-import { useEffect } from 'preact/hooks';
-import { ErrorBox, Loading, Toasts } from './components/Feedback.tsx';
+import { ErrorBox, Loading, SyncStatus, Toasts } from './components/Feedback.tsx';
 import { IconEdit, IconMore, IconToday, IconWeek } from './components/Icons.tsx';
 import { NotifyPrompt } from './components/NotifyPrompt.tsx';
 import { IS_OFFICE } from './config.ts';
@@ -25,12 +24,9 @@ export function App() {
   const session = useStore((s) => s.session);
   const boot = useStore((s) => s.boot);
   const bootError = useStore((s) => s.bootError);
+  // Re-render on resume so "today" is recomputed after the app sat in the background overnight
+  useStore((s) => s.resumeTick);
   const route = useRoute();
-
-  // Cached data renders instantly; refresh the roster/statuses once per app start
-  useEffect(() => {
-    if (session) void store.loadBoot();
-  }, [session?.token]);
 
   if (!session) {
     return (
@@ -72,7 +68,10 @@ export function App() {
     <div class="app">
       <header class="topbar">
         <span class="topbar-title">📍 איפה כולם</span>
-        <Toasts />
+        <span class="topbar-status">
+          <Toasts />
+          <SyncStatus />
+        </span>
       </header>
       <main class="content">{screen}</main>
       {!IS_OFFICE && <NotifyPrompt />}

@@ -423,6 +423,37 @@
   color: var(--success);
 }
 
+/* Top bar right side: autosave text + sync control */
+.topbar-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.spinner.is-small {
+  width: 1rem;
+  height: 1rem;
+}
+
+.sync {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  color: var(--text-muted);
+}
+
+.sync.is-stale {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-pill);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
 .toast-region {
   position: fixed;
   inset-inline: var(--space-3);

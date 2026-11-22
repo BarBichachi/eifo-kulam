@@ -5,6 +5,22 @@ const SUN = '2026-11-15';
 const MON = '2026-11-16';
 
 describe('bootstrap', () => {
+  it('login and bootstrap can return the first weeks in the same call', () => {
+    const w = world();
+    const alice = w.loginAs(ALICE);
+    w.ok('setDays', { token: alice, memberId: ALICE.id, days: [{ date: SUN, statusId: 'home', note: '' }] });
+
+    const login = w.ok('login', { phone: BOB.phone!, from: '2026-11-08', to: '2026-11-28' });
+    expect(login.boot?.members).toHaveLength(4);
+    expect(login.boot?.members.every((m) => m.phone === undefined)).toBe(true);
+    expect(login.range?.entries.map((e) => e.date)).toEqual([SUN]);
+
+    const boot = w.ok('bootstrap', { token: login.token, from: SUN, to: '2026-11-21' });
+    expect(boot.range?.entries).toHaveLength(1);
+    expect(w.ok('bootstrap', { token: login.token }).range).toBeUndefined();
+    expect(errorCode(w.call('bootstrap', { token: login.token, from: SUN }))).toBe('BAD_REQUEST');
+  });
+
   it('strips phones for members and keeps them for admins', () => {
     const w = world();
     const member = w.ok('bootstrap', { token: w.loginAs(ALICE) });
@@ -102,6 +118,13 @@ describe('getRange', () => {
     expect(w.ok('getRange', { token, from: SUN, to: '2026-11-21' }).holidays).toEqual([]);
     w.ok('getRange', { token, from: SUN, to: '2026-11-21' });
     expect(w.p.fetchCalls).toHaveLength(2);
+  });
+
+  it('does not import holidays for years far from now', () => {
+    const w = world();
+    const token = w.loginAs(ALICE);
+    w.ok('getRange', { token, from: '1999-12-26', to: '2000-01-08' });
+    expect(w.p.fetchCalls).toHaveLength(0);
   });
 
   it('rejects bad and oversized ranges', () => {

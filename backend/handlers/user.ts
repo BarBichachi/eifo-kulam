@@ -1,4 +1,4 @@
-import { MAX_RANGE_DAYS, type ApiMap, type Bootstrap } from '../../shared/api.ts';
+import { MAX_RANGE_DAYS, type ApiMap, type Bootstrap, type RangeData, type RangeReq } from '../../shared/api.ts';
 import { daysBetween, isIsoDate } from '../../shared/dates.ts';
 import { AppError, ERR } from '../../shared/errors.ts';
 import { normalizeDays } from '../../shared/status.ts';
@@ -28,6 +28,17 @@ export function getRange(ctx: Ctx, req: ApiMap['getRange']['req']): ApiMap['getR
   if (daysBetween(from, to) > MAX_RANGE_DAYS) throw new AppError(ERR.BAD_REQUEST, `אפשר לבקש עד ${MAX_RANGE_DAYS} ימים`);
   ensureHolidayYears(ctx, from, to);
   return { entries: ctx.repo.entriesBetween(from, to), holidays: ctx.repo.holidaysBetween(from, to) };
+}
+
+/** Adds { range } when the request carries from/to (lets one call cover the first screens). */
+export function rangeIfAsked(ctx: Ctx, req: RangeReq): { range?: RangeData } {
+  if (req?.from === undefined && req?.to === undefined) return {};
+  return { range: getRange(ctx, { from: String(req.from), to: String(req.to) }) };
+}
+
+/** Login plus everything the app needs to render, in a single round trip. */
+export function withBoot(ctx: Ctx, auth: { token: string; me: Member }, req: RangeReq): ApiMap['login']['res'] {
+  return { ...auth, boot: bootstrap(ctx, auth.me), ...rangeIfAsked(ctx, req) };
 }
 
 const sameDay = (e: Entry | undefined, statusId: string, note: string) => (e?.statusId ?? '') === statusId && (e?.note ?? '') === note;

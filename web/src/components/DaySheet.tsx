@@ -30,7 +30,8 @@ function formatUpdated(iso: string): string {
 export function DaySheet({ target, onChange }: Props) {
   const boot = useStore((s) => s.boot);
   const statusMap = useStatusMap();
-  const ws = weekStart(target?.date ?? '2000-01-02');
+  // Closed sheet: no week to load
+  const ws = target ? weekStart(target.date) : null;
   const { entries, holidays } = useWeek(ws);
   const member = boot?.members.find((m) => m.id === target?.memberId);
   const me = boot?.me;
