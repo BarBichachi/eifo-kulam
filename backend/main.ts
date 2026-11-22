@@ -1,4 +1,5 @@
 import { makeCtx } from './context.ts';
+import { dispatchWeeklyReminder } from './handlers/push.ts';
 import { gasPlatform } from './platform.gas.ts';
 import { Repo } from './repo/repo.ts';
 import { ensureSchema, ensureSchemaIfNeeded, openTables, spreadsheet } from './repo/setup.ts';
@@ -41,8 +42,31 @@ export function api(body: string): string {
   return respond(typeof body === 'string' ? body : '');
 }
 
-/** Run once from the Apps Script editor: authorizes the script and creates the tabs. */
+const REMINDER_HANDLER = 'weeklyReminderTrigger';
+
+/**
+ * Run once from the editor (approve "manage triggers"): (re)creates the Wednesday reminder trigger.
+ * Reads and writes no Sheet data.
+ */
+export function installTriggers() {
+  for (const t of ScriptApp.getProjectTriggers()) {
+    if (t.getHandlerFunction() === REMINDER_HANDLER) ScriptApp.deleteTrigger(t);
+  }
+  // Fires somewhere in 07:05-07:35; the GitHub run then waits for 07:30 if it is early
+  ScriptApp.newTrigger(REMINDER_HANDLER).timeBased().onWeekDay(ScriptApp.WeekDay.WEDNESDAY).atHour(7).nearMinute(20).inTimezone('Asia/Jerusalem').create();
+  console.log('Wednesday reminder trigger installed (about 07:05-07:35 Israel time)');
+}
+
+/** Time-driven trigger: starts the weekly reminder run on GitHub. A thrown error makes Google email the owner. */
+export function weeklyReminderTrigger() {
+  const ctx = makeCtx(new Repo(openTables()), gasPlatform);
+  if (!dispatchWeeklyReminder(ctx)) throw new Error('Could not start the weekly reminder on GitHub (check GITHUB_DISPATCH_TOKEN)');
+  console.log('Weekly reminder run started on GitHub');
+}
+
+/** Run once from the Apps Script editor: authorizes the script, creates the tabs and the reminder trigger. */
 export function setup() {
   ensureSchema();
+  installTriggers();
   console.log(`Ready: ${spreadsheet().getUrl()}`);
 }

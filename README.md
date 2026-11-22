@@ -94,7 +94,7 @@ web apps), GitHub CLI logged in as `BarBichachi`.
 3. Create the Sheet + bound script: `npm run clasp -- create-script --type sheets --title "איפה כולם" --rootDir build/gas`
    (writes `.clasp.json`, gitignored).
 4. `npm run gas:push`, then open the script (`npm run clasp -- open-script`), run **setup** once and accept the
-   permissions. This creates the tabs and seeds the statuses.
+   permissions. This creates the tabs, seeds the statuses and installs the Wednesday reminder trigger.
 5. `npm run gas:deploy`: creates the web app deployment and writes `GAS_DEPLOYMENT_ID` and `API_URL` to `.env`.
    The same `API_URL` is the office PC address (opening it in a browser shows the office copy).
 6. `npm run configure`: generates `SERVICE_TOKEN` and VAPID keys in `.env` and stores them in Script Properties.
@@ -104,9 +104,10 @@ web apps), GitHub CLI logged in as `BarBichachi`.
    - Variables: `API_URL` (from `.env`), `APP_URL` = `https://barbichachi.github.io/eifo-kulam/`
    - Secrets: `SERVICE_TOKEN`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (from `.env`)
    - Pages: source "GitHub Actions". Pushing to `main` deploys the site.
-9. Optional, for the in-app "שליחת התראת בדיקה" button: create a fine-grained token limited to this repository
-   with "Actions: Read and write", put it in `.env` as `GITHUB_DISPATCH_TOKEN` and run `npm run configure` again.
-   Without it, the button shows a local notification only.
+9. Required for an on-time Wednesday reminder (and the in-app "שליחת התראת בדיקה" button): create a fine-grained
+   token limited to this repository with "Actions: Read and write", put it in `.env` as `GITHUB_DISPATCH_TOKEN` and
+   run `npm run configure` again. When the token expires, create a new one the same way (Google emails a trigger
+   failure on the next Wednesday as a reminder). Without it, only the less reliable GitHub schedule sends reminders.
 
 ## Day to day
 
@@ -122,12 +123,19 @@ web apps), GitHub CLI logged in as `BarBichachi`.
 
 ### Weekly reminder timing
 
-Two crons (`04:05` and `05:05` UTC on Wednesday) cover Israel winter and summer time. Each run computes Israel
-time: before 07:00 it exits (the wrong-offset run), between 07:00 and 07:30 it waits, between 07:30 and 12:00 it
-sends. `svcReminderClaim` in the Sheet makes the send exactly-once per week; if nothing could be delivered the
-claim is released so the second run retries. Subscriptions that the browser revoked (HTTP 404/410) are removed.
-The workflow re-enables itself on every scheduled run so GitHub's 60-day inactivity rule never disables it.
-GitHub may start scheduled runs late under load; the 07:05 start leaves 25 minutes of buffer.
+Primary: an Apps Script time-driven trigger (`weeklyReminderTrigger`, installed by `installTriggers`) fires every
+Wednesday around 07:05-07:35 Israel time and starts the reminder workflow through the GitHub API
+(`GITHUB_DISPATCH_TOKEN`); on-demand runs start within seconds. GitHub's own schedule is not reliable on its own:
+on 18.11.2026 the scheduled runs started 8.5 hours late.
+
+Backup: two crons (`04:05` and `05:05` UTC on Wednesday) in the workflow.
+
+Every run computes Israel time: before 07:00 it exits, between 07:00 and 07:30 it waits, between 07:30 and 20:00 it
+sends (late is better than never). `svcReminderClaim` in the Sheet makes the send exactly-once per week; if nothing
+could be delivered the claim is released so a later run retries. Subscriptions that the browser revoked (HTTP
+404/410) are removed. The workflow re-enables itself on every scheduled run so GitHub's 60-day inactivity rule never
+disables the backup. If the trigger cannot start the workflow (e.g. the dispatch token expired), it throws and
+Google emails the script owner.
 
 ## Development
 
@@ -157,5 +165,5 @@ GitHub may start scheduled runs late under load; the 07:05 start leaves 25 minut
 | `clasp` / `gh` fail with "unable to get local issuer certificate" | TLS inspection on the office network: use `npm run clasp -- ...` (sets `NODE_USE_SYSTEM_CA=1`), or set that variable for other Node tools. |
 | API returns HTML instead of JSON | Web app access is not "Anyone", or the script needs re-authorization: open the editor and run `setup`. Note: `clasp create-script` overwrites `build/gas/appsscript.json`; always push with `npm run gas:push`, which rebuilds it. |
 | No notification on iPhone | Not opened from the home-screen icon, or notifications denied in iOS Settings > Notifications. |
-| Reminder did not arrive | Check the Weekly reminder run in Actions, and the coverage list in ניהול > התראות. |
+| Reminder did not arrive | Check the Weekly reminder run in Actions (a `workflow_dispatch` run around 07:10 on Wednesday means the Apps Script trigger fired), the trigger in the Apps Script editor (Triggers, clock icon; reinstall with `installTriggers`), and the coverage list in ניהול > התראות. |
 | Someone shows a wrong holiday | Edit the `holidays` tab (`isDayOff`), the app picks it up on the next load. |

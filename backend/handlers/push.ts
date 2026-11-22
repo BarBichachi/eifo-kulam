@@ -48,15 +48,11 @@ export function pushUnsubscribe(ctx: Ctx, me: Member, req: ApiMap['pushUnsubscri
   return { ok: true };
 }
 
-/** Asks GitHub Actions to send a real push to this member's devices (same path as the weekly reminder). */
-export function pushTest(ctx: Ctx, me: Member): ApiMap['pushTest']['res'] {
+/** Starts the reminder workflow on GitHub (on-demand runs start within seconds, unlike scheduled ones). */
+function dispatchReminderWorkflow(ctx: Ctx, inputs: Record<string, string>): boolean {
   const repo = ctx.p.props.get(PROP.GITHUB_REPO);
   const token = ctx.p.props.get(PROP.GITHUB_DISPATCH_TOKEN);
   if (!repo || !token) throw new AppError(ERR.NOT_CONFIGURED, 'שליחת בדיקה מהאפליקציה עוד לא הוגדרה. פנו למנהל/ת.');
-  if (!ctx.repo.t.push.rows().some((r) => r.memberId === me.id)) bad('ההתראות לא מופעלות במכשיר הזה. הפעילו אותן קודם.');
-  const cooldownKey = `push-test:${me.id}`;
-  if (ctx.p.cache.get(cooldownKey)) throw new AppError(ERR.RATE_LIMITED, 'בדיקה כבר נשלחה. חכו דקה ונסו שוב.');
-
   const res = ctx.p.fetch(`https://api.github.com/repos/${repo}/actions/workflows/reminder.yml/dispatches`, {
     method: 'post',
     headers: {
@@ -65,14 +61,39 @@ export function pushTest(ctx: Ctx, me: Member): ApiMap['pushTest']['res'] {
       'X-GitHub-Api-Version': '2022-11-28',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ ref: 'main', inputs: { memberId: me.id } }),
+    body: JSON.stringify({ ref: 'main', inputs }),
   });
-  if (res.status !== 204) {
-    ctx.p.log('GitHub dispatch failed', { status: res.status, body: res.body.slice(0, 500) });
-    throw new AppError(ERR.INTERNAL, 'שליחת הבדיקה נכשלה. נסו שוב מאוחר יותר.');
-  }
+  if (res.status === 204) return true;
+  ctx.p.log('GitHub dispatch failed', { status: res.status, body: res.body.slice(0, 500) });
+  return false;
+}
+
+/** Asks GitHub Actions to send a real push to this member's devices (same path as the weekly reminder). */
+export function pushTest(ctx: Ctx, me: Member): ApiMap['pushTest']['res'] {
+  const repo = ctx.p.props.get(PROP.GITHUB_REPO);
+  const token = ctx.p.props.get(PROP.GITHUB_DISPATCH_TOKEN);
+  if (!repo || !token) throw new AppError(ERR.NOT_CONFIGURED, 'שליחת בדיקה מהאפליקציה עוד לא הוגדרה. פנו למנהל/ת.');
+  if (!ctx.repo.t.push.rows().some((r) => r.memberId === me.id)) bad('ההתראות לא מופעלות במכשיר הזה. הפעילו אותן קודם.');
+  const cooldownKey = `push-test:${me.id}`;
+  if (ctx.p.cache.get(cooldownKey)) throw new AppError(ERR.RATE_LIMITED, 'בדיקה כבר נשלחה. חכו דקה ונסו שוב.');
+  if (!dispatchReminderWorkflow(ctx, { memberId: me.id })) throw new AppError(ERR.INTERNAL, 'שליחת הבדיקה נכשלה. נסו שוב מאוחר יותר.');
   ctx.p.cache.put(cooldownKey, '1', TEST_COOLDOWN_SECONDS);
   return { ok: true };
+}
+
+const DISPATCH_ATTEMPTS = 3;
+const DISPATCH_RETRY_MS = 10_000;
+
+/**
+ * Wednesday Apps Script trigger (around 07:05-07:35): starts the weekly reminder run. The run itself waits
+ * for 07:30 and the weekly claim keeps it to one send even if the GitHub schedule backup also fires.
+ */
+export function dispatchWeeklyReminder(ctx: Ctx): boolean {
+  for (let attempt = 1; attempt <= DISPATCH_ATTEMPTS; attempt++) {
+    if (dispatchReminderWorkflow(ctx, {})) return true;
+    if (attempt < DISPATCH_ATTEMPTS) ctx.p.sleep(DISPATCH_RETRY_MS);
+  }
+  return false;
 }
 
 export function pushCoverage(ctx: Ctx): ApiMap['pushCoverage']['res'] {

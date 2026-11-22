@@ -14,7 +14,7 @@ const OFFICE_DIR = 'build/office-web';
 const GLOBAL = '__EifoKulam';
 
 // Apps Script only sees top-level function declarations, so each export gets a thin global wrapper
-const ENTRY_POINTS = ['doGet', 'doPost', 'setup', 'api'];
+const ENTRY_POINTS = ['doGet', 'doPost', 'setup', 'api', 'installTriggers', 'weeklyReminderTrigger'];
 
 loadEnv();
 mkdirSync(OUT_DIR, { recursive: true });

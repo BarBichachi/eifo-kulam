@@ -40,9 +40,11 @@ describe('reminderDecision', () => {
     expect(reminderDecision(new Date('2027-06-02T05:05:00Z')).action).toBe('send');
   });
 
-  it('skips other days and afternoons', () => {
+  it('skips other days and late evenings, but still sends when GitHub runs hours late', () => {
     expect(reminderDecision(new Date('2026-11-17T05:30:00Z')).action).toBe('skip');
-    expect(reminderDecision(new Date('2026-11-18T10:30:00Z')).action).toBe('skip');
+    // 18.11.2026 the scheduled runs started at 14:42 Israel time: that must still send
+    expect(reminderDecision(new Date('2026-11-18T12:42:00Z')).action).toBe('send');
+    expect(reminderDecision(new Date('2026-11-18T18:30:00Z')).action).toBe('skip');
   });
 
   it('targets next week and deep-links to the editor', () => {

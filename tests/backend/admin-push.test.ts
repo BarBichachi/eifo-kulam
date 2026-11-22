@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PROP } from '../../backend/platform.ts';
+import { dispatchWeeklyReminder } from '../../backend/handlers/push.ts';
 import { ADMIN, ALICE, BOB, errorCode, world } from './world.ts';
 
 const SVC = 'svc-token-'.padEnd(40, 'x');
@@ -106,6 +107,19 @@ describe('push', () => {
     expect(claim()).toBe(false);
     claim(true);
     expect(claim()).toBe(true);
+  });
+
+  it('weekly trigger starts the reminder workflow, retrying a failing GitHub', () => {
+    const w = world();
+    w.p.propsData.set(PROP.GITHUB_REPO, 'owner/repo');
+    w.p.propsData.set(PROP.GITHUB_DISPATCH_TOKEN, 'gh');
+    let calls = 0;
+    w.p.fetchImpl = () => (++calls < 3 ? { status: 502, body: 'bad gateway' } : { status: 204, body: '' });
+    expect(dispatchWeeklyReminder(w.ctx)).toBe(true);
+    expect(w.p.fetchCalls).toHaveLength(3);
+    expect(JSON.parse(w.p.fetchCalls[2]!.body!)).toEqual({ ref: 'main', inputs: {} });
+    w.p.fetchImpl = () => ({ status: 401, body: 'expired token' });
+    expect(dispatchWeeklyReminder(w.ctx)).toBe(false);
   });
 
   it('test push: needs config, a subscription, and is rate limited', () => {
