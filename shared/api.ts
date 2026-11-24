@@ -1,4 +1,4 @@
-import type { DayInput, Entry, Holiday, Member, Status } from './types.ts';
+import type { DayInput, Entry, Holiday, Me, Member, Status, Viewer } from './types.ts';
 
 /** Request payload of actions that take no parameters. */
 export type NoParams = Record<never, never>;
@@ -7,7 +7,7 @@ export type NoParams = Record<never, never>;
 export const MAX_RANGE_DAYS = 400;
 
 export interface Bootstrap {
-  me: Member;
+  me: Me;
   /** Phones are stripped unless the caller is an admin. */
   members: Member[];
   /** Including retired statuses, so old days still render. */
@@ -51,6 +51,12 @@ export interface MemberInput {
   order?: number;
 }
 
+export interface ViewerInput {
+  id?: string;
+  name: string;
+  phone: string;
+}
+
 export type StatusInput = Omit<Status, 'id' | 'order'> & { id?: string; order?: number };
 
 export interface ServiceConfig {
@@ -74,7 +80,7 @@ export interface RangeData {
 /** Every API action: request payload and response data. Requests also carry a session or service token. */
 export interface ApiMap {
   health: { req: NoParams; res: { name: string; version: string; time: string } };
-  login: { req: { phone: string } & RangeReq; res: { token: string; me: Member; boot?: Bootstrap; range?: RangeData } };
+  login: { req: { phone: string } & RangeReq; res: { token: string; me: Me; boot?: Bootstrap; range?: RangeData } };
   logout: { req: NoParams; res: { ok: true } };
   bootstrap: { req: RangeReq; res: Bootstrap & { range?: RangeData } };
   getRange: { req: { from: string; to: string }; res: RangeData };
@@ -85,6 +91,9 @@ export interface ApiMap {
   saveStatus: { req: { status: StatusInput }; res: { status: Status } };
   revokeSessions: { req: { memberId: string }; res: { revoked: number } };
   reorder: { req: { kind: 'members' | 'statuses'; ids: string[] }; res: { ok: true } };
+  adminViewers: { req: NoParams; res: { viewers: Viewer[] } };
+  saveViewer: { req: { viewer: ViewerInput }; res: { viewer: Viewer } };
+  deleteViewer: { req: { viewerId: string }; res: { revoked: number } };
 
   pushSubscribe: { req: { subscription: PushSubscriptionInput }; res: { ok: true } };
   pushUnsubscribe: { req: { endpoint: string }; res: { ok: true } };

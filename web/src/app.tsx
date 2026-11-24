@@ -15,11 +15,11 @@ import { Week } from './screens/Week.tsx';
 const NAV = [
   { name: 'today', label: 'היום', href: '#/today', Icon: IconToday },
   { name: 'week', label: 'שבוע', href: '#/week', Icon: IconWeek },
-  { name: 'me', label: 'השבוע שלי', href: '#/me', Icon: IconEdit },
+  { name: 'me', label: 'השבוע שלי', href: '#/me', Icon: IconEdit, membersOnly: true },
   { name: 'more', label: 'עוד', href: '#/more', Icon: IconMore },
 ];
 
-/** Auth gate + screen routing + bottom navigation. */
+/** Auth gate + screen routing + bottom navigation. Read-only viewers get no editing screen. */
 export function App() {
   const session = useStore((s) => s.session);
   const boot = useStore((s) => s.boot);
@@ -53,30 +53,35 @@ export function App() {
     );
   }
 
+  const readOnly = boot.me.readOnly === true;
+  // Viewers have no "my week": an old link to it lands on today
+  const blocked = readOnly && route.name === 'me';
+  const routeName = blocked ? 'today' : route.name;
+  const param = blocked ? undefined : route.param;
   const screen = (() => {
-    switch (route.name) {
-      case 'week': return <Week param={route.param} />;
-      case 'me': return <MyWeek param={route.param} />;
+    switch (routeName) {
+      case 'week': return <Week param={param} />;
+      case 'me': return <MyWeek param={param} />;
       case 'more': return <More />;
-      case 'admin': return <Admin param={route.param} />;
-      default: return <Today param={route.param} />;
+      case 'admin': return <Admin param={param} />;
+      default: return <Today param={param} />;
     }
   })();
 
-  const active = route.name === 'admin' ? 'more' : route.name;
+  const active = routeName === 'admin' ? 'more' : routeName;
   return (
     <div class="app">
       <header class="topbar">
-        <span class="topbar-title">📍 איפה כולם</span>
+        <span class="topbar-title">📍 איפה כולם {readOnly && <span class="tag is-accent">צפייה בלבד</span>}</span>
         <span class="topbar-status">
           <Toasts />
           <SyncStatus />
         </span>
       </header>
       <main class="content">{screen}</main>
-      {!IS_OFFICE && <NotifyPrompt />}
+      {!IS_OFFICE && !readOnly && <NotifyPrompt />}
       <nav class="bottom-nav" aria-label="ניווט ראשי">
-        {NAV.map(({ name, label, href, Icon }) => (
+        {NAV.filter((item) => !(readOnly && item.membersOnly)).map(({ name, label, href, Icon }) => (
           <a key={name} href={href} class={`nav-item${active === name ? ' is-active' : ''}`} aria-current={active === name ? 'page' : undefined}>
             <Icon />
             <span>{label}</span>

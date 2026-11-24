@@ -1,4 +1,4 @@
-import type { Category, Entry, Holiday, Member, MemberType, Status } from '../../shared/types.ts';
+import type { Category, Entry, Holiday, Member, MemberType, Status, Viewer } from '../../shared/types.ts';
 import type { PushSub } from '../../shared/api.ts';
 import { sortMembers, sortStatuses } from '../../shared/status.ts';
 import { normalizePhone } from '../../shared/phone.ts';
@@ -32,6 +32,15 @@ export const fromMember = (m: Member): Row => ({
   id: m.id, name: m.name, phone: m.phone ?? '', type: m.type,
   isAdmin: boolStr(m.isAdmin), active: boolStr(m.active), order: String(m.order),
 });
+
+export const toViewer = (r: Row): Viewer => ({
+  id: r.id ?? '',
+  name: (r.name ?? '').trim(),
+  phone: normalizePhone(r.phone ?? '') ?? '',
+  createdAt: r.createdAt ?? '',
+});
+
+export const fromViewer = (v: Viewer): Row => ({ id: v.id, name: v.name, phone: v.phone ?? '', createdAt: v.createdAt });
 
 const CATEGORIES = new Set<Category>(['office', 'elsewhere', 'off']);
 
@@ -83,6 +92,11 @@ export class Repo {
 
   statuses(): Status[] {
     return sortStatuses(this.t.statuses.rows().map(toStatus).filter((s) => s.id && s.label));
+  }
+
+  /** Read-only accounts, by name. */
+  viewers(): Viewer[] {
+    return this.t.viewers.rows().map(toViewer).filter((v) => v.id && v.name).sort((a, b) => a.name.localeCompare(b.name, 'he'));
   }
 
   statusMap(): Map<string, Status> {

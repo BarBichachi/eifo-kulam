@@ -1,12 +1,12 @@
 import type { Bootstrap, RangeData } from '../../../shared/api.ts';
 import { addDays, israelToday, nextWeekStart, weekStart } from '../../../shared/dates.ts';
-import type { DayInput, Entry, Holiday, Member } from '../../../shared/types.ts';
+import type { DayInput, Entry, Holiday, Me } from '../../../shared/types.ts';
 import { api, ApiError } from './api.ts';
 import { readJson, removeKey, writeJson } from './storage.ts';
 
 export interface Session {
   token: string;
-  me: Member;
+  me: Me;
 }
 
 export interface WeekData {

@@ -8,6 +8,7 @@ export const SCHEMA = {
   holidays: ['date', 'name', 'isDayOff', 'source'],
   log: ['timestamp', 'actorId', 'memberId', 'date', 'before', 'after'],
   settings: ['key', 'value'],
+  viewers: ['id', 'name', 'phone', 'createdAt'],
 } as const;
 
 export type TableName = keyof typeof SCHEMA;
@@ -15,4 +16,4 @@ export type TableName = keyof typeof SCHEMA;
 export const TABLE_NAMES = Object.keys(SCHEMA) as TableName[];
 
 /** Bump when SCHEMA changes so deployed scripts add new tabs/columns on the next request. */
-export const SCHEMA_VERSION = '1';
+export const SCHEMA_VERSION = '2';

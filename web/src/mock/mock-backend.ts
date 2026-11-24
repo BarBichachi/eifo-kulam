@@ -60,6 +60,7 @@ function seed(): Record<TableName, Row[]> {
     ],
     log: [],
     settings: [],
+    viewers: [{ id: 'v1', name: 'מנהל אגף', phone: '0500000099', createdAt: new Date().toISOString() }],
   };
 }
 

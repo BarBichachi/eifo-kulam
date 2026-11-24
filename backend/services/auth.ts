@@ -1,6 +1,6 @@
 import { AppError, ERR } from '../../shared/errors.ts';
 import { normalizePhone } from '../../shared/phone.ts';
-import type { Member } from '../../shared/types.ts';
+import type { Me, Viewer } from '../../shared/types.ts';
 import type { Ctx } from '../context.ts';
 import { PROP } from '../platform.ts';
 
@@ -15,15 +15,28 @@ const cacheKey = (hash: string) => `s:${hash}`;
 
 const unauthorized = () => new AppError(ERR.UNAUTHORIZED, 'החיבור פג. יש להתחבר מחדש עם מספר הטלפון.');
 
-// Phone-only login: the number must belong to an active member. Failures are throttled globally.
-export function login(ctx: Ctx, rawPhone: unknown): { token: string; me: Member } {
+/** Member-shaped identity for a read-only viewer, so handlers and the app share one `me` type. */
+export const viewerIdentity = (v: Viewer): Me => ({
+  id: v.id, name: v.name, phone: v.phone, type: 'regular', isAdmin: false, active: true, order: 0, readOnly: true,
+});
+
+/** Who a session belongs to: an active member, or a viewer. Team members win if a phone is somehow on both. */
+function findIdentity(ctx: Ctx, match: (who: { id: string; phone?: string }) => boolean): Me | undefined {
+  const member = ctx.repo.members().find((m) => m.active && match(m));
+  if (member) return member;
+  const viewer = ctx.repo.viewers().find(match);
+  return viewer ? viewerIdentity(viewer) : undefined;
+}
+
+// Phone-only login: the number must belong to an active member or a viewer. Failures are throttled globally.
+export function login(ctx: Ctx, rawPhone: unknown): { token: string; me: Me } {
   const fails = Number(ctx.p.cache.get(LOGIN_FAIL_KEY) ?? '0');
   if (fails >= LOGIN_FAIL_LIMIT) throw new AppError(ERR.RATE_LIMITED, 'יותר מדי ניסיונות כניסה. נסו שוב בעוד שעה.');
 
   const phone = normalizePhone(rawPhone);
   if (!phone) throw new AppError(ERR.BAD_REQUEST, 'מספר הטלפון לא תקין. דוגמה: 0501234567');
 
-  const me = ctx.repo.members().find((m) => m.active && m.phone === phone);
+  const me = findIdentity(ctx, (who) => who.phone === phone);
   if (!me) {
     ctx.p.cache.put(LOGIN_FAIL_KEY, String(fails + 1), LOGIN_FAIL_WINDOW_SECONDS);
     ctx.p.sleep(500);
@@ -38,8 +51,8 @@ export function login(ctx: Ctx, rawPhone: unknown): { token: string; me: Member 
   return { token, me };
 }
 
-// Resolves a session token to an active member (cache first, then the sessions tab)
-export function authenticate(ctx: Ctx, token: unknown): Member {
+// Resolves a session token to an active member or a viewer (cache first, then the sessions tab)
+export function authenticate(ctx: Ctx, token: unknown): Me {
   if (typeof token !== 'string' || token.length < 32) throw unauthorized();
   const hash = ctx.p.sha256Hex(token);
   let memberId = ctx.p.cache.get(cacheKey(hash));
@@ -51,7 +64,7 @@ export function authenticate(ctx: Ctx, token: unknown): Member {
     refreshLastSeen(ctx, hash);
     ctx.p.cache.put(cacheKey(hash), memberId, SESSION_CACHE_SECONDS);
   }
-  const me = ctx.repo.members().find((m) => m.id === memberId && m.active);
+  const me = findIdentity(ctx, (who) => who.id === memberId);
   if (!me) throw unauthorized();
   return me;
 }

@@ -6,22 +6,30 @@ import type { Member, Status } from '../../shared/types.ts';
 import { newId, type Ctx } from '../context.ts';
 import { fromMember, fromStatus, toMember, toStatus } from '../repo/repo.ts';
 
-const bad = (message: string): never => {
+export const bad = (message: string): never => {
   throw new AppError(ERR.BAD_REQUEST, message);
 };
 
-const cleanText = (v: unknown, max: number, field: string): string => {
+export const cleanText = (v: unknown, max: number, field: string): string => {
   const s = typeof v === 'string' ? v.trim().replace(/\s+/g, ' ') : '';
   if (!s) bad(`חסר ${field}`);
   if (s.length > max) bad(`${field} ארוך מדי (עד ${max} תווים)`);
   return s;
 };
 
+/** Login phones must be unique across members and viewers: rejects a phone already used by anyone else. */
+export function assertPhoneFree(ctx: Ctx, phone: string, exceptId?: string): void {
+  const member = ctx.repo.t.members.rows().map(toMember).find((m) => m.id !== exceptId && m.phone === phone);
+  if (member) bad(`המספר ${phone} כבר שייך ל${member.name}`);
+  const viewer = ctx.repo.viewers().find((v) => v.id !== exceptId && v.phone === phone);
+  if (viewer) bad(`המספר ${phone} כבר שייך לצופה ${viewer.name}`);
+}
+
 /** Validates a member form; phone must be a unique Israeli mobile number. */
-function validateMember(input: MemberInput, others: Member[]): Omit<Member, 'id' | 'order'> {
+function validateMember(ctx: Ctx, input: MemberInput, exceptId: string | undefined): Omit<Member, 'id' | 'order'> {
   const name = cleanText(input?.name, 40, 'שם');
   const phone = normalizePhone(input?.phone) ?? bad('מספר טלפון לא תקין');
-  if (others.some((m) => m.phone === phone)) bad(`המספר ${phone} כבר שייך ל${others.find((m) => m.phone === phone)?.name}`);
+  assertPhoneFree(ctx, phone, exceptId);
   if (input.type !== 'regular' && input.type !== 'student') bad('סוג עובד לא תקין');
   return { name, phone, type: input.type, isAdmin: input.isAdmin === true, active: input.active !== false };
 }
@@ -32,7 +40,7 @@ function upsertMember(ctx: Ctx, input: MemberInput): Member {
   const all = table.rows().map(toMember);
   const index = input.id ? all.findIndex((m) => m.id === input.id) : -1;
   if (input.id && index < 0) throw new AppError(ERR.NOT_FOUND, 'חבר הצוות לא נמצא');
-  const fields = validateMember(input, all.filter((_, i) => i !== index));
+  const fields = validateMember(ctx, input, all[index]?.id);
   const order = typeof input.order === 'number' ? input.order : (all[index]?.order ?? Math.max(0, ...all.map((m) => m.order)) + 1);
   const member: Member = { id: all[index]?.id ?? newId(ctx, 'm'), order, ...fields };
 

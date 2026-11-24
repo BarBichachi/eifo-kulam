@@ -3,7 +3,7 @@ import { daysBetween, isIsoDate } from '../../shared/dates.ts';
 import { AppError, ERR } from '../../shared/errors.ts';
 import { normalizeDays } from '../../shared/status.ts';
 import { entryKey } from '../../shared/week.ts';
-import type { Entry, Member } from '../../shared/types.ts';
+import type { Entry, Me, Member } from '../../shared/types.ts';
 import type { Ctx } from '../context.ts';
 import { PROP } from '../platform.ts';
 import { fromEntry, toEntry } from '../repo/repo.ts';
@@ -11,7 +11,7 @@ import { ensureHolidayYears } from '../services/holidays.ts';
 
 const stripPhone = ({ phone: _phone, ...m }: Member): Member => m;
 
-export function bootstrap(ctx: Ctx, me: Member): Bootstrap {
+export function bootstrap(ctx: Ctx, me: Me): Bootstrap {
   const members = ctx.repo.members();
   return {
     me,
@@ -37,7 +37,7 @@ export function rangeIfAsked(ctx: Ctx, req: RangeReq): { range?: RangeData } {
 }
 
 /** Login plus everything the app needs to render, in a single round trip. */
-export function withBoot(ctx: Ctx, auth: { token: string; me: Member }, req: RangeReq): ApiMap['login']['res'] {
+export function withBoot(ctx: Ctx, auth: { token: string; me: Me }, req: RangeReq): ApiMap['login']['res'] {
   return { ...auth, boot: bootstrap(ctx, auth.me), ...rangeIfAsked(ctx, req) };
 }
 

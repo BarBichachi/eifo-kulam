@@ -59,7 +59,7 @@ export function Login() {
           </button>
         </form>
         <p class="muted login-foot">נשארים מחוברים במכשיר הזה עד שלוחצים על "התנתקות".</p>
-        {IS_MOCK && <p class="banner is-info">מצב הדגמה: 0500000001 (מנהלת), 0500000002 עד 0500000010</p>}
+        {IS_MOCK && <p class="banner is-info">מצב הדגמה: 0500000001 (מנהלת), 0500000002 עד 0500000010, 0500000099 (צפייה בלבד)</p>}
       </div>
     </main>
   );

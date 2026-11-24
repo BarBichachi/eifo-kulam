@@ -22,6 +22,7 @@ export function More() {
   const next = useWeek(nextWs);
   const current = useWeek(thisWs);
   const missing = next.loaded ? notFilled(boot.members, nextWs, next.entries, next.holidays) : [];
+  const readOnly = boot.me.readOnly === true;
 
   const share = (text: string) => window.open(whatsappShareUrl(text), '_blank', 'noopener');
 
@@ -45,11 +46,13 @@ export function More() {
         {missing.some((m) => m.id === boot.me.id) && (
           <button type="button" class="btn is-primary is-block" onClick={() => navigate(`/me/${nextWs}`)}>לעדכן את השבוע שלי</button>
         )}
-        <div class="row-actions">
-          <button type="button" class="btn" disabled={!next.loaded} onClick={() => share(reminderText(nextWs, missing, APP_URL))}>
-            <IconShare /> תזכורת לקבוצה
-          </button>
-        </div>
+        {!readOnly && (
+          <div class="row-actions">
+            <button type="button" class="btn" disabled={!next.loaded} onClick={() => share(reminderText(nextWs, missing, APP_URL))}>
+              <IconShare /> תזכורת לקבוצה
+            </button>
+          </div>
+        )}
       </section>
 
       <section class="card">
@@ -65,7 +68,9 @@ export function More() {
         </div>
       </section>
 
-      {IS_OFFICE ? (
+      {readOnly ? (
+        !IS_OFFICE && <InstallCard />
+      ) : IS_OFFICE ? (
         <PhoneAppCard />
       ) : (
         <>
@@ -77,7 +82,7 @@ export function More() {
       {boot.me.isAdmin && (
         <section class="card">
           <h2 class="card-title">🛠️ ניהול</h2>
-          <p class="muted">חברי צוות, סטטוסים ומצב התראות.</p>
+          <p class="muted">חברי צוות, צופים, סטטוסים ומצב התראות.</p>
           <button type="button" class="btn is-block" onClick={() => navigate('/admin/members')}>מעבר לניהול</button>
         </section>
       )}
@@ -85,7 +90,7 @@ export function More() {
       <section class="card">
         <h2 class="card-title">👤 {boot.me.name}</h2>
         <p class="muted">
-          {boot.me.phone ? <span dir="ltr">{formatPhone(boot.me.phone)}</span> : null} · {MEMBER_TYPE_LABELS[boot.me.type]}
+          {boot.me.phone ? <span dir="ltr">{formatPhone(boot.me.phone)}</span> : null} · {readOnly ? 'צפייה בלבד' : MEMBER_TYPE_LABELS[boot.me.type]}
           {boot.me.isAdmin ? ' · מנהל/ת' : ''}
         </p>
         <button type="button" class="btn is-danger is-block" onClick={() => void logoutWithPush(token)}>התנתקות</button>

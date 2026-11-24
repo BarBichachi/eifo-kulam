@@ -5,14 +5,16 @@ import { navigate } from '../lib/router.ts';
 import { MembersTab } from './admin/MembersTab.tsx';
 import { PushTab } from './admin/PushTab.tsx';
 import { StatusesTab } from './admin/StatusesTab.tsx';
+import { ViewersTab } from './admin/ViewersTab.tsx';
 
 const TABS = [
   ['members', 'צוות'],
+  ['viewers', 'צופים'],
   ['statuses', 'סטטוסים'],
   ['push', 'התראות'],
 ] as const;
 
-/** Admin area: roster, status options and notification coverage. */
+/** Admin area: roster, read-only viewers, status options and notification coverage. */
 export function Admin({ param }: { param?: string }) {
   const boot = useStore((s) => s.boot)!;
   const tab = TABS.some(([id]) => id === param) ? param : 'members';
@@ -28,6 +30,7 @@ export function Admin({ param }: { param?: string }) {
         ))}
       </nav>
       {tab === 'members' && <MembersTab members={boot.members} />}
+      {tab === 'viewers' && <ViewersTab />}
       {tab === 'statuses' && <StatusesTab statuses={sortStatuses(boot.statuses)} />}
       {tab === 'push' && <PushTab members={boot.members} />}
     </section>

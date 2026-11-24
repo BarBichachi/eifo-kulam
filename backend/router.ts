@@ -1,20 +1,25 @@
 import type { Action, ApiResponse } from '../shared/api.ts';
 import { AppError, ERR } from '../shared/errors.ts';
-import type { Member } from '../shared/types.ts';
+import type { Me } from '../shared/types.ts';
 import type { Ctx } from './context.ts';
 import { adminMembers, importMembers, reorder, saveMember, saveStatus } from './handlers/admin.ts';
 import { pushCoverage, pushSubscribe, pushTest, pushUnsubscribe, svcPushList, svcPushReport, svcReminderClaim } from './handlers/push.ts';
 import { svcConfigure } from './handlers/service.ts';
 import { bootstrap, getRange, rangeIfAsked, setDays, withBoot } from './handlers/user.ts';
+import { adminViewers, deleteViewer, saveViewer } from './handlers/viewers.ts';
 import { authenticate, login, logout, requireService, revokeMemberSessions } from './services/auth.ts';
 
 export const APP_VERSION = '1.0.0';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Req = any;
+/**
+ * Access levels: none, session (anyone logged in, including read-only viewers),
+ * member (team members only: writes and push), admin, service (shared secret).
+ */
 type Route =
   | { auth: 'none'; run: (ctx: Ctx, req: Req) => unknown }
-  | { auth: 'user' | 'admin'; run: (ctx: Ctx, req: Req, me: Member) => unknown }
+  | { auth: 'session' | 'member' | 'admin'; run: (ctx: Ctx, req: Req, me: Me) => unknown }
   | { auth: 'service'; run: (ctx: Ctx, req: Req) => unknown };
 
 /** Every action, its access level and handler. */
@@ -22,9 +27,9 @@ const ROUTES: Record<Action, Route> = {
   health: { auth: 'none', run: (ctx) => ({ name: 'eifo-kulam', version: APP_VERSION, time: ctx.p.now().toISOString() }) },
   login: { auth: 'none', run: (ctx, req) => withBoot(ctx, login(ctx, req.phone), req) },
   logout: { auth: 'none', run: (ctx, req) => (logout(ctx, req.token), { ok: true }) },
-  bootstrap: { auth: 'user', run: (ctx, req, me) => ({ ...bootstrap(ctx, me), ...rangeIfAsked(ctx, req) }) },
-  getRange: { auth: 'user', run: (ctx, req) => getRange(ctx, req) },
-  setDays: { auth: 'user', run: (ctx, req, me) => setDays(ctx, me, req) },
+  bootstrap: { auth: 'session', run: (ctx, req, me) => ({ ...bootstrap(ctx, me), ...rangeIfAsked(ctx, req) }) },
+  getRange: { auth: 'session', run: (ctx, req) => getRange(ctx, req) },
+  setDays: { auth: 'member', run: (ctx, req, me) => setDays(ctx, me, req) },
 
   adminMembers: { auth: 'admin', run: (ctx) => adminMembers(ctx) },
   saveMember: { auth: 'admin', run: (ctx, req) => saveMember(ctx, req) },
@@ -37,10 +42,13 @@ const ROUTES: Record<Action, Route> = {
       return reorder(ctx, req.kind, req.ids);
     },
   },
+  adminViewers: { auth: 'admin', run: (ctx) => adminViewers(ctx) },
+  saveViewer: { auth: 'admin', run: (ctx, req) => saveViewer(ctx, req) },
+  deleteViewer: { auth: 'admin', run: (ctx, req) => deleteViewer(ctx, req) },
 
-  pushSubscribe: { auth: 'user', run: (ctx, req, me) => pushSubscribe(ctx, me, req) },
-  pushUnsubscribe: { auth: 'user', run: (ctx, req, me) => pushUnsubscribe(ctx, me, req) },
-  pushTest: { auth: 'user', run: (ctx, _req, me) => pushTest(ctx, me) },
+  pushSubscribe: { auth: 'member', run: (ctx, req, me) => pushSubscribe(ctx, me, req) },
+  pushUnsubscribe: { auth: 'member', run: (ctx, req, me) => pushUnsubscribe(ctx, me, req) },
+  pushTest: { auth: 'member', run: (ctx, _req, me) => pushTest(ctx, me) },
   pushCoverage: { auth: 'admin', run: (ctx) => pushCoverage(ctx) },
 
   // svcConfigure checks its own token (the first call bootstraps it)
@@ -71,6 +79,7 @@ export function handle(ctx: Ctx, body: string): ApiResponse {
       return { ok: true, data: route.run(ctx, req) as never };
     }
     const me = authenticate(ctx, req.token);
+    if (route.auth === 'member' && me.readOnly) throw new AppError(ERR.FORBIDDEN, 'החשבון הזה לצפייה בלבד.');
     if (route.auth === 'admin' && !me.isAdmin) throw new AppError(ERR.FORBIDDEN, 'הפעולה זמינה למנהלים בלבד');
     return { ok: true, data: route.run(ctx, req, me) as never };
   } catch (err) {

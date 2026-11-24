@@ -59,6 +59,7 @@ export function installTriggers() {
 
 /** Time-driven trigger: starts the weekly reminder run on GitHub. A thrown error makes Google email the owner. */
 export function weeklyReminderTrigger() {
+  ensureSchemaIfNeeded();
   const ctx = makeCtx(new Repo(openTables()), gasPlatform);
   if (!dispatchWeeklyReminder(ctx)) throw new Error('Could not start the weekly reminder on GitHub (check GITHUB_DISPATCH_TOKEN)');
   console.log('Weekly reminder run started on GitHub');

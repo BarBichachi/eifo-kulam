@@ -16,6 +16,18 @@ export interface Member {
   phone?: string;
 }
 
+/** Read-only account: logs in by phone to see where the team is. Not on the roster and never fills days. */
+export interface Viewer {
+  id: string;
+  name: string;
+  /** Only present in admin responses. */
+  phone?: string;
+  createdAt: string;
+}
+
+/** The logged-in identity. A viewer is given a member-shaped identity with readOnly set. */
+export type Me = Member & { readOnly?: boolean };
+
 export interface Status {
   id: string;
   label: string;

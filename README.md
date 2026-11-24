@@ -3,6 +3,8 @@
 Weekly team attendance for phones: who is in the office, who is on vacation, in the field or on reserve duty.
 Each person logs in with their phone number, fills in their own days (quick picks or free text), and sees
 everyone else read-only. A push notification every Wednesday at 07:30 reminds the team to fill next week.
+Admins can also add read-only **viewers** (people outside the team, by phone number) who see every screen but
+cannot update anything.
 
 - Phone app (PWA): https://barbichachi.github.io/eifo-kulam/
 - Office PC copy: the Apps Script web app URL (`API_URL` in `.env` / repo variable), opened in a browser.
@@ -16,7 +18,12 @@ everyone else read-only. A push notification every Wednesday at 07:30 reminds th
 | שבוע | Everyone x Sun-Thu grid with real dates, office headcount per day, holidays. Any past or future week. Tap a cell for details. |
 | השבוע שלי | Your week (next week by default): one-tap "all week as usual", copy last week, date range (e.g. 3 weeks of vacation), per-day status + note. Saves automatically. |
 | עוד | Who has not filled next week yet, WhatsApp share (reminder text / week summary), notifications on/off + test, install guide, logout. |
-| ניהול (admins) | Team members (name, phone, regular/student, admin, active, order), statuses (emoji, label, color, category, note required, active, order), notification coverage. |
+| ניהול (admins) | Team members (name, phone, regular/student, admin, active, order), read-only viewers (name, phone), statuses (emoji, label, color, category, note required, active, order), notification coverage. |
+
+Viewers (ניהול > צופים) log in with their phone like everyone else and see היום, שבוע and עוד (who has not
+updated, week summary share). They are not on the roster: no row in the grid, no headcount, no "not updated",
+no "השבוע שלי", no notifications, and every write is rejected by the server. Deleting a viewer signs them out
+of every device.
 
 On every launch of the phone app, if notifications are off for that device, a sheet asks to turn them on (iPhone
 in a browser tab gets the home-screen install steps instead). If they are on, the device is silently re-registered.
@@ -64,11 +71,12 @@ only one that can install to the home screen and receive push notifications.
 | `members` | id, name, phone, type (regular/student), isAdmin, active, order |
 | `statuses` | id, label, emoji, color, category (office/elsewhere/off), requiresNote, active, order |
 | `entries` | date, memberId, statusId, note, updatedAt, updatedBy (empty statusId = reset to default) |
-| `sessions` | tokenHash, memberId, createdAt, lastSeenAt |
+| `sessions` | tokenHash, memberId, createdAt, lastSeenAt (memberId is a viewer id for viewer sessions) |
 | `push` | memberId, endpoint, p256dh, auth, createdAt, lastResult, lastResultAt |
 | `holidays` | date, name, isDayOff, source (imported lazily per year from Hebcal, only within 2 years of today; edit `isDayOff` freely) |
 | `log` | timestamp, actorId, memberId, date, before, after (every change) |
 | `settings` | key, value (holiday years loaded, last reminder week) |
+| `viewers` | id, name, phone, createdAt (read-only accounts; a phone can belong to a member or a viewer, not both) |
 
 All cells are plain text (keeps leading zeros and ISO dates). Tabs and columns are created by `setup()` and
 upgraded automatically when `SCHEMA_VERSION` changes. Columns are matched by header name; extra columns you add
@@ -81,7 +89,8 @@ by hand are preserved.
 - Login is by phone number only (no SMS code), as agreed: anyone who knows a colleague's number can log in as
   them. Failed logins are throttled (60 per hour globally). Sessions are random 256-bit tokens, stored hashed,
   kept on the device until "התנתקות"; admins can revoke all sessions of a member.
-- Members can edit only themselves (including past days); admins can edit anyone. Every change is in the `log` tab.
+- Members can edit only themselves (including past days); admins can edit anyone; viewers can edit nothing (the
+  router allows them only the read actions `bootstrap` and `getRange`). Every change is in the `log` tab.
 - Service calls (GitHub Actions, local scripts) use `SERVICE_TOKEN`, stored in Script Properties and GitHub secrets.
 
 ## One-time setup
@@ -114,6 +123,7 @@ web apps), GitHub CLI logged in as `BarBichachi`.
 | Task | How |
 | --- | --- |
 | Add / remove a team member | Admin screen (צוות). Deactivate instead of deleting to keep history. |
+| Give someone outside the team read-only access | Admin screen (צופים): name + phone. Delete to revoke (signs them out everywhere). |
 | New status option | Admin screen (סטטוסים). Category decides the office headcount. |
 | A holiday is (not) a day off | Edit `isDayOff` in the `holidays` tab. |
 | Change backend or office copy | `npm run gas:deploy` (rebuilds `Code.js` + `Index.html`, same URL, Sheet data untouched). |
